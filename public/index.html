@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Storico Consumi Tuya</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Tuya Energy</p>
+          <h1>Storico consumi dettagliato</h1>
+          <p class="subhead">Scarica il dettaglio ogni 5 minuti del 17/12/2025 e genera il grafico in un click.</p>
+        </div>
+        <div class="chip">Region: EU</div>
+      </header>
+
+      <section class="card">
+        <form id="energy-form">
+          <div class="grid">
+            <label>
+              Device ID
+              <input name="deviceId" type="text" placeholder="es. bf12345..." required />
+            </label>
+            <label>
+              Region
+              <select name="region" required>
+                <option value="eu" selected>eu</option>
+                <option value="us">us</option>
+                <option value="cn">cn</option>
+                <option value="in">in</option>
+              </select>
+            </label>
+            <label>
+              Data
+              <input name="date" type="date" required />
+            </label>
+            <label>
+              Intervallo (min)
+              <input name="interval" type="number" min="1" value="5" required />
+            </label>
+            <label>
+              DP Code
+              <input name="dpCode" type="text" value="add_ele" />
+            </label>
+            <label>
+              Tipo Statistica
+              <select name="statType">
+                <option value="sum" selected>sum</option>
+                <option value="avg">avg</option>
+                <option value="max">max</option>
+                <option value="min">min</option>
+                <option value="last">last</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit">Carica dati</button>
+            <button id="download-csv" type="button" disabled>Scarica CSV</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="chart-wrap">
+          <canvas id="energy-chart"></canvas>
+        </div>
+        <div id="status" class="status">Pronto.</div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

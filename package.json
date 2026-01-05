@@ -1,0 +1,16 @@
+{
+  "name": "tuya-energy-microapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Micro app web per scaricare lo storico consumi Tuya e generare grafico",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "test:integration": "node --test test/integration.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

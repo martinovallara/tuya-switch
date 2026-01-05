@@ -1,0 +1,157 @@
+:root {
+  color-scheme: only light;
+  --bg: #f6f2e9;
+  --card: #fff8ee;
+  --ink: #1f1a14;
+  --accent: #f8b400;
+  --accent-dark: #c47700;
+  --shadow: rgba(20, 16, 12, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Space Grotesk", "Poppins", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top left, #fff3da, transparent 55%),
+    radial-gradient(circle at bottom right, #ffe4b0, transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 12px;
+  margin: 0;
+  opacity: 0.7;
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  margin: 8px 0;
+}
+
+.subhead {
+  max-width: 520px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #2b1b00;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 18px 45px -40px rgba(0, 0, 0, 0.3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+input,
+select {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+.actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #2b1b00;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -10px var(--shadow);
+}
+
+button:disabled {
+  background: #f1d396;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.chart-wrap {
+  height: 380px;
+}
+
+.status {
+  margin-top: 14px;
+  font-weight: 600;
+}
+
+.status[data-tone="ok"] {
+  color: #2f7a3d;
+}
+
+.status[data-tone="warn"] {
+  color: #8a5b00;
+}
+
+.status[data-tone="error"] {
+  color: #a6382d;
+}
+
+@media (max-width: 680px) {
+  .card {
+    padding: 18px;
+  }
+
+  .chart-wrap {
+    height: 300px;
+  }
+}
