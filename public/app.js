@@ -10,6 +10,55 @@ dateInput.value = DEFAULT_DATE;
 let chartInstance = null;
 let latestCsv = "";
 
+const LOCALE = "it-IT";
+
+const DP_CONVERSIONS = {
+  cur_voltage: {
+    label: "Tensione",
+    unit: "V",
+    convert: (value) => value / 10
+  },
+  cur_current: {
+    label: "Corrente",
+    unit: "A",
+    convert: (value) => value / 1000
+  },
+  cur_power: {
+    label: "Potenza",
+    unit: "W",
+    convert: (value) => value / 10
+  },
+  add_ele1: {
+    label: "Energia",
+    unit: "Wh",
+    convert: (value) => value
+  }
+};
+
+function getDpConversion(dpCode) {
+  return (
+    DP_CONVERSIONS[dpCode] || {
+      label: "Consumo",
+      unit: "kWh",
+      convert: (value) => value
+    }
+  );
+}
+
+function formatNumber(value, decimals) {
+  return Number(value).toLocaleString(LOCALE, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
+function formatCsvNumber(value) {
+  return Number(value).toLocaleString(LOCALE, {
+    useGrouping: false,
+    maximumFractionDigits: 6
+  });
+}
+
 function formatStatus(message, tone = "info") {
   statusEl.textContent = message;
   statusEl.dataset.tone = tone;
@@ -48,7 +97,8 @@ function toChartData(points) {
   }));
 }
 
-function renderChart(points) {
+function renderChart(points, conversion) {
+  const { label, unit } = conversion;
   const labels = points.map((p) => new Date(p.time).toLocaleTimeString());
   const values = points.map((p) => p.value);
 
@@ -62,7 +112,7 @@ function renderChart(points) {
       labels,
       datasets: [
         {
-          label: "Consumo (kWh)",
+          label: `${label} (${unit})`,
           data: values,
           borderColor: "#f8b400",
           backgroundColor: "rgba(248, 180, 0, 0.2)",
@@ -74,11 +124,22 @@ function renderChart(points) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      locale: LOCALE,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (context) => `${label}: ${formatNumber(context.parsed.y, 3)} ${unit}`
+          }
+        }
+      },
       scales: {
         y: {
           title: {
             display: true,
-            text: "kWh"
+            text: unit
+          },
+          ticks: {
+            callback: (value) => formatNumber(value, 3)
           }
         }
       }
@@ -86,9 +147,10 @@ function renderChart(points) {
   });
 }
 
-function buildCsv(points) {
-  const header = "timestamp_iso, value_kwh";
-  const rows = points.map((p) => `${new Date(p.time).toISOString()}, ${p.value}`);
+function buildCsv(points, conversion) {
+  const unitSlug = conversion.unit.toLowerCase();
+  const header = `timestamp_iso; value_${unitSlug}`;
+  const rows = points.map((p) => `${new Date(p.time).toISOString()}; ${formatCsvNumber(p.value)}`);
   return [header, ...rows].join("\n");
 }
 
@@ -122,13 +184,19 @@ form.addEventListener("submit", async (event) => {
       throw new Error(json.error || "Errore API");
     }
     const rawPoints = normalizeTuyaResult(json.data);
-    const points = toChartData(rawPoints).filter((p) => Number.isFinite(p.value));
+    const conversion = getDpConversion(payload.dpCode);
+    const points = toChartData(rawPoints)
+      .map((point) => ({
+        ...point,
+        value: conversion.convert(point.value)
+      }))
+      .filter((p) => Number.isFinite(p.value));
     if (!points.length) {
       formatStatus("Nessun dato disponibile. Verifica device/DP code.", "warn");
       return;
     }
-    renderChart(points);
-    latestCsv = buildCsv(points);
+    renderChart(points, conversion);
+    latestCsv = buildCsv(points, conversion);
     downloadBtn.disabled = false;
     formatStatus(`Caricati ${points.length} punti.`, "ok");
   } catch (err) {

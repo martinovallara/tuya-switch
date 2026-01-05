@@ -4,6 +4,15 @@ let isSelecting = false;
 let selectionStart = null;
 let chartData = null; // Salva i dati originali
 
+const LOCALE = 'it-IT';
+
+function formatNumber(value, decimals) {
+  return Number(value).toLocaleString(LOCALE, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
 // Inizializza con la data di oggi
 document.getElementById('dateInput').valueAsDate = new Date();
 document.getElementById('dateInput').addEventListener('change', loadData);
@@ -64,7 +73,8 @@ function processLogs(logs) {
     const powerKey = Object.keys(log).find(k => 
       k.toLowerCase().includes('power') || k.toLowerCase().includes('watts') || k === 'cur_power'
     );
-    const instantPowerW = powerKey ? parseFloat(log[powerKey].value) || 0 : 0;
+    const powerValueRaw = powerKey ? parseFloat(log[powerKey].value) || 0 : 0;
+    const instantPowerW = powerKey === 'cur_power' ? powerValueRaw / 10 : powerValueRaw;
     const instantPowerKW = instantPowerW / 1000;
     instantPowers.push(instantPowerKW);
 
@@ -74,7 +84,9 @@ function processLogs(logs) {
       const prevLog = logs[index - 1];
       const prevTime = new Date(prevLog.timestamp);
       const timeInterval = (time - prevTime) / 3600000; // Converti millisecondi in ore
-      const avgPower = (instantPowerKW + (parseFloat(logs[index - 1][powerKey]?.value || 0) / 1000)) / 2;
+      const prevRaw = powerKey ? parseFloat(logs[index - 1][powerKey]?.value || 0) : 0;
+      const prevPowerW = powerKey === 'cur_power' ? prevRaw / 10 : prevRaw;
+      const avgPower = (instantPowerKW + (prevPowerW / 1000)) / 2;
       cumulativeEnergy += avgPower * timeInterval;
     }
     cumulativePowerIntegrated.push(cumulativeEnergy);
@@ -161,7 +173,10 @@ function renderCharts(data) {
         },
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Potenza (kW)' }
+          title: { display: true, text: 'Potenza (kW)' },
+          ticks: {
+            callback: (value) => formatNumber(value, 2)
+          }
         }
       }
     }
@@ -214,7 +229,10 @@ function renderCharts(data) {
         },
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Energia (kWh)' }
+          title: { display: true, text: 'Energia (kWh)' },
+          ticks: {
+            callback: (value) => formatNumber(value, 4)
+          }
         }
       }
     }
@@ -286,22 +304,22 @@ function updateStatistics(data, startIndex, endIndex) {
   const visibleTimes = originalTimes.slice(startIndex, endIndex + 1);
 
   const avgPower = visiblePowers.length > 0 
-    ? (visiblePowers.reduce((a, b) => a + b, 0) / visiblePowers.length).toFixed(2)
+    ? formatNumber(visiblePowers.reduce((a, b) => a + b, 0) / visiblePowers.length, 2)
     : '-';
 
   const maxPower = visiblePowers.length > 0 
-    ? Math.max(...visiblePowers).toFixed(2)
+    ? formatNumber(Math.max(...visiblePowers), 2)
     : '-';
 
   const minPower = visiblePowers.length > 0 
-    ? Math.min(...visiblePowers).toFixed(2)
+    ? formatNumber(Math.min(...visiblePowers), 2)
     : '-';
 
   // Consumo = differenza tra valore finale e iniziale dell'intervallo
   const totalConsumption = visibleEnergy.length > 1
-    ? (visibleEnergy[visibleEnergy.length - 1] - visibleEnergy[0]).toFixed(4)
+    ? formatNumber(visibleEnergy[visibleEnergy.length - 1] - visibleEnergy[0], 4)
     : visibleEnergy.length === 1
-    ? visibleEnergy[0].toFixed(4)
+    ? formatNumber(visibleEnergy[0], 4)
     : '0.0000';
 
   // Mostra intervallo temporale
