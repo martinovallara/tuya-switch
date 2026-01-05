@@ -14,6 +14,24 @@ npm start
 
 Apri `http://localhost:3000`.
 
+## Frontend Next.js (dashboard)
+
+Avvia il backend e la dashboard Next.js su porte diverse:
+
+```bash
+# PowerShell
+$env:BACKEND_URL="http://localhost:3000"; npm run dev:web
+```
+
+Apri `http://localhost:3001/dashboard`.
+
+### Avvio unico (backend + frontend)
+
+```bash
+# PowerShell
+$env:BACKEND_URL="http://localhost:3000"; npm run dev:all
+```
+
 ## Note
 
 - Il DP code di default e `add_ele` (kWh). Se il tuo device usa un altro codice, cambialo nel form.
@@ -23,3 +41,5 @@ Apri `http://localhost:3000`.
   - `/v1.0/iot-03/devices/{deviceId}/statistics`
   - `/v1.0/devices/{deviceId}/statistics`
 - Per i report log puoi usare `TUYA_REPORT_PATHS` e `TUYA_REPORT_CODES` (codici separati da virgole).
+- La dashboard Next.js inoltra `/api/*` al backend tramite rewrite.
+- `public/dashboard.html` rimane disponibile come versione legacy.

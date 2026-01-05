@@ -13,7 +13,7 @@ test(
   "integration: fetch device statistics from Tuya",
   { skip: requiredEnv.some((value) => !value) },
   async () => {
-    const { getAccessToken, fetchDeviceReportLogs, BASE_URLS } = require("../server");
+    const { getAccessToken, fetchDeviceReportLogs, BASE_URLS } = require("../server.cjs");
     const region = (process.env.TUYA_REGION || "").trim();
     const baseUrl = BASE_URLS[region];
 
@@ -71,7 +71,7 @@ test(
       !process.env.TUYA_ASSET_ID
   },
   async () => {
-    const { getAccessToken, tuyaRequest, BASE_URLS } = require("../server");
+    const { getAccessToken, tuyaRequest, BASE_URLS } = require("../server.cjs");
     const region = process.env.TUYA_REGION;
     const baseUrl = BASE_URLS[region];
 

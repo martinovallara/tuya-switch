@@ -10,7 +10,7 @@ const {
   tuyaRequest,
   BASE_URLS,
   saveDeviceLog
-} = require('../server');
+} = require('../server.cjs');
 
 let lastAccessToken = null;
 let lastAccessTokenTime = 0;

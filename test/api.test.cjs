@@ -8,7 +8,7 @@ const {
   normalizeQuery,
   buildSignedHeaders,
   tuyaRequest
-} = require("../server");
+} = require("../server.cjs");
 
 beforeEach(() => {
   delete global.fetch;

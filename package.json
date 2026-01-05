@@ -3,14 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "description": "Micro app web per scaricare lo storico consumi Tuya e generare grafico",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server.cjs",
+    "dev": "node server.cjs",
+    "dev:web": "next dev -p 3001",
+    "dev:all": "node server.cjs & next dev -p 3001",
+    "build:web": "next build",
+    "start:web": "next start -p 3001",
     "test": "node --test",
-    "test:integration": "node --test test/integration.test.js"
+    "test:integration": "node --test test/integration.test.cjs"
   },
   "dependencies": {
+    "chart.js": "^4.4.1",
+    "chartjs-plugin-zoom": "^2.0.1",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "next": "^14.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }
