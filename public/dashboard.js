@@ -2,7 +2,10 @@ let instantPowerChart = null;
 let cumulativePowerChart = null;
 let isSelecting = false;
 let selectionStart = null;
+let selectionStartPx = null;
 let chartData = null; // Salva i dati originali
+let zoomState = null;
+const DEBUG_ZOOM = true;
 
 const LOCALE = 'it-IT';
 
@@ -11,6 +14,54 @@ function formatNumber(value, decimals) {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   });
+}
+
+if (window.Chart) {
+  Chart.defaults.locale = LOCALE;
+}
+
+function getFreshCanvas(canvasId) {
+  const existing = document.getElementById(canvasId);
+  const replacement = existing.cloneNode(true);
+  existing.parentNode.replaceChild(replacement, existing);
+  return replacement;
+}
+
+function normalizeZoomRange(times) {
+  if (!zoomState || times.length < 2) return null;
+  const maxIndex = times.length - 1;
+  const min = Math.max(0, Math.min(maxIndex, zoomState.min));
+  const max = Math.max(0, Math.min(maxIndex, zoomState.max));
+  if (max <= min) return null;
+  return { min, max };
+}
+
+function applyZoomState(times) {
+  const range = normalizeZoomRange(times);
+  if (!range) {
+    if (DEBUG_ZOOM) {
+      console.log('[zoom] no range to apply', zoomState);
+    }
+    zoomState = null;
+    return null;
+  }
+
+  [instantPowerChart, cumulativePowerChart].forEach((chart) => {
+    if (!chart) return;
+    chart.options.scales.x.min = range.min;
+    chart.options.scales.x.max = range.max;
+    if (typeof chart.zoomScale === 'function') {
+      chart.zoomScale('x', { min: range.min, max: range.max });
+    } else {
+      chart.update();
+    }
+  });
+
+  if (DEBUG_ZOOM) {
+    console.log('[zoom] applied', range);
+  }
+
+  return range;
 }
 
 // Inizializza con la data di oggi
@@ -45,8 +96,19 @@ async function loadData() {
 
     // Elabora i dati
     chartData = processLogs(logs);
+    if (DEBUG_ZOOM) {
+      console.log('[zoom] refresh', {
+        logs: logs.length,
+        zoomState
+      });
+    }
     renderCharts(chartData);
-    updateStatistics(chartData, 0, chartData.times.length - 1);
+    const zoomRange = applyZoomState(chartData.times);
+    if (zoomRange) {
+      updateStatistics(chartData, zoomRange.min, zoomRange.max);
+    } else {
+      updateStatistics(chartData, 0, chartData.times.length - 1);
+    }
     updateStatus(`${logs.length} letture caricate`);
     clearError();
   } catch (error) {
@@ -106,11 +168,6 @@ function processLogs(logs) {
   const lastDeviceRaw = addEleRaw[addEleRaw.length - 1] - addEleRaw[0];
   const conversionFactor = lastIntegrated > 0 ? lastDeviceRaw / lastIntegrated : 1;
 
-  console.log(`📊 Analisi Energia:`);
-  console.log(`  • Energia integrata dalla potenza: ${lastIntegrated.toFixed(6)} kWh`);
-  console.log(`  • Differenza add_ele grezzo: ${lastDeviceRaw}`);
-  console.log(`  • Fattore di conversione: ${conversionFactor.toFixed(4)}`);
-  console.log(`  • Stima unità add_ele: 1 unità = ${(1 / conversionFactor).toFixed(6)} kWh`);
 
   return {
     times,
@@ -127,144 +184,243 @@ function renderCharts(data) {
   const { times, instantPowers, cumulativePowerIntegrated } = data;
 
   // Chart Potenza Istantanea
-  if (instantPowerChart) {
-    instantPowerChart.destroy();
-  }
-
-  const instantCtx = document.getElementById('instantPowerChart').getContext('2d');
-  instantPowerChart = new Chart(instantCtx, {
-    type: 'line',
-    data: {
-      labels: times,
-      datasets: [{
-        label: 'Potenza (kW)',
-        data: instantPowers,
-        borderColor: '#667eea',
-        backgroundColor: 'rgba(102, 126, 234, 0.05)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: '#667eea'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true },
-        zoom: {
-          zoom: {
-            wheel: { enabled: true, speed: 0.1, modifierKey: 'ctrl' },
-            pinch: { enabled: true },
-            mode: 'x'
-          },
-          pan: {
-            enabled: true,
-            mode: 'x',
-            modifierKey: 'shift'
-          }
-        }
+  if (!instantPowerChart) {
+    const instantCanvas = getFreshCanvas('instantPowerChart');
+    const instantCtx = instantCanvas.getContext('2d');
+    instantPowerChart = new Chart(instantCtx, {
+      type: 'line',
+      data: {
+        labels: times,
+        datasets: [{
+          label: 'Potenza (kW)',
+          data: instantPowers,
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.05)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: '#667eea'
+        }]
       },
-      scales: {
-        x: {
-          type: 'category'
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true },
+          zoom: {
+            zoom: {
+              wheel: { enabled: true, speed: 0.1, modifierKey: 'ctrl' },
+              pinch: { enabled: true },
+              mode: 'x'
+            },
+            pan: {
+              enabled: true,
+              mode: 'x',
+              modifierKey: 'shift'
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Potenza: ${formatNumber(context.parsed.y, 3)} kW`
+            }
+          }
         },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'Potenza (kW)' },
-          ticks: {
-            callback: (value) => formatNumber(value, 2)
+        scales: {
+          x: {
+            type: 'category'
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Potenza (kW)' },
+            ticks: {
+              callback: (value) => formatNumber(value, 2)
+            }
           }
         }
       }
-    }
-  });
+    });
+    addChartSelectionListener(instantCanvas, instantPowerChart);
+  } else {
+    instantPowerChart.data.labels = times;
+    instantPowerChart.data.datasets[0].data = instantPowers;
+    instantPowerChart.update();
+  }
 
   // Chart Energia Cumulata (usa integrazione)
-  if (cumulativePowerChart) {
-    cumulativePowerChart.destroy();
-  }
-
-  const cumulativeCtx = document.getElementById('cumulativePowerChart').getContext('2d');
-  cumulativePowerChart = new Chart(cumulativeCtx, {
-    type: 'line',
-    data: {
-      labels: times,
-      datasets: [{
-        label: 'Energia (kWh) - Integrata da Potenza',
-        data: cumulativePowerIntegrated,
-        borderColor: '#764ba2',
-        backgroundColor: 'rgba(118, 75, 162, 0.05)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: '#764ba2'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true },
-        zoom: {
-          zoom: {
-            wheel: { enabled: true, speed: 0.1, modifierKey: 'ctrl' },
-            pinch: { enabled: true },
-            mode: 'x'
-          },
-          pan: {
-            enabled: true,
-            mode: 'x',
-            modifierKey: 'shift'
-          }
-        }
+  if (!cumulativePowerChart) {
+    const cumulativeCanvas = getFreshCanvas('cumulativePowerChart');
+    const cumulativeCtx = cumulativeCanvas.getContext('2d');
+    cumulativePowerChart = new Chart(cumulativeCtx, {
+      type: 'line',
+      data: {
+        labels: times,
+        datasets: [{
+          label: 'Energia (kWh) - Integrata da Potenza',
+          data: cumulativePowerIntegrated,
+          borderColor: '#764ba2',
+          backgroundColor: 'rgba(118, 75, 162, 0.05)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: '#764ba2'
+        }]
       },
-      scales: {
-        x: {
-          type: 'category'
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true },
+          zoom: {
+            zoom: {
+              wheel: { enabled: true, speed: 0.1, modifierKey: 'ctrl' },
+              pinch: { enabled: true },
+              mode: 'x'
+            },
+            pan: {
+              enabled: true,
+              mode: 'x',
+              modifierKey: 'shift'
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Energia: ${formatNumber(context.parsed.y, 4)} kWh`
+            }
+          }
         },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'Energia (kWh)' },
-          ticks: {
-            callback: (value) => formatNumber(value, 4)
+        scales: {
+          x: {
+            type: 'category'
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Energia (kWh)' },
+            ticks: {
+              callback: (value) => formatNumber(value, 4)
+            }
           }
         }
       }
-    }
-  });
-
-  // Aggiungi event listener per selezione intervallo temporale
-  addChartSelectionListener(document.getElementById('instantPowerChart'), instantPowerChart, times, data);
-  addChartSelectionListener(document.getElementById('cumulativePowerChart'), cumulativePowerChart, times, data);
+    });
+    addChartSelectionListener(cumulativeCanvas, cumulativePowerChart);
+  } else {
+    cumulativePowerChart.data.labels = times;
+    cumulativePowerChart.data.datasets[0].data = cumulativePowerIntegrated;
+    cumulativePowerChart.update();
+  }
 }
 
-function addChartSelectionListener(canvas, chart, times, data) {
+function addChartSelectionListener(canvas, chart) {
+  const container = canvas.parentElement;
+  container.querySelectorAll('.selection-box, .selection-label').forEach((el) => el.remove());
+  const selectionBox = document.createElement('div');
+  selectionBox.className = 'selection-box';
+  const selectionLabel = document.createElement('div');
+  selectionLabel.className = 'selection-label';
+  container.appendChild(selectionBox);
+  container.appendChild(selectionLabel);
+
+  const getTimes = () => (chartData && Array.isArray(chartData.times) ? chartData.times : []);
+  const clampIndex = (value) => {
+    const times = getTimes();
+    if (!times.length) return 0;
+    return Math.max(0, Math.min(times.length - 1, value));
+  };
+  const timeAtX = (x, width) => {
+    const times = getTimes();
+    if (!times.length) return '-';
+    const index = clampIndex(Math.round((x / width) * (times.length - 1)));
+    return times[index];
+  };
+
   canvas.addEventListener('mousedown', (e) => {
+    const times = getTimes();
+    if (!times.length) return;
     isSelecting = true;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const canvasWidth = canvas.offsetWidth;
+    selectionStartPx = x;
     selectionStart = x / canvasWidth;
+    selectionBox.style.left = `${x}px`;
+    selectionBox.style.width = '0px';
+    selectionBox.style.display = 'block';
+    selectionLabel.textContent = `${timeAtX(x, canvasWidth)} – ${timeAtX(x, canvasWidth)}`;
+    selectionLabel.style.left = `${x}px`;
+    selectionLabel.style.display = 'block';
+  });
+
+  canvas.addEventListener('dblclick', () => {
+    resetZoom();
   });
 
   canvas.addEventListener('mousemove', (e) => {
     if (!isSelecting) return;
     canvas.style.cursor = 'col-resize';
+    const times = getTimes();
+    if (!times.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const left = Math.min(selectionStartPx, x);
+    const width = Math.abs(x - selectionStartPx);
+    selectionBox.style.left = `${left}px`;
+    selectionBox.style.width = `${width}px`;
+    const startTime = timeAtX(selectionStartPx, canvas.offsetWidth);
+    const endTime = timeAtX(x, canvas.offsetWidth);
+    selectionLabel.textContent = `${startTime} – ${endTime}`;
+    selectionLabel.style.left = `${left}px`;
   });
+
+  canvas.addEventListener('wheel', (e) => {
+    if (isSelecting) return;
+    const currentData = chartData;
+    const times = currentData?.times || [];
+    if (!times.length) return;
+    const min = chart.options.scales.x.min;
+    const max = chart.options.scales.x.max;
+    if (typeof min !== 'number' || typeof max !== 'number') return;
+
+    e.preventDefault();
+    const windowSize = max - min;
+    if (windowSize <= 0) return;
+
+    const step = Math.max(1, Math.round(windowSize * 0.1));
+    const direction = e.deltaY > 0 ? 1 : -1;
+    const newMin = clampIndex(min + direction * step);
+    const newMax = clampIndex(newMin + windowSize);
+
+    chart.options.scales.x.min = newMin;
+    chart.options.scales.x.max = newMax;
+    if (typeof chart.zoomScale === 'function') {
+      chart.zoomScale('x', { min: newMin, max: newMax });
+    } else {
+      chart.update();
+    }
+    zoomState = { min: newMin, max: newMax };
+    if (DEBUG_ZOOM) {
+      console.log('[zoom] wheel', zoomState);
+    }
+    updateStatistics(currentData, newMin, newMax);
+  }, { passive: false });
 
   canvas.addEventListener('mouseup', (e) => {
     if (!isSelecting) return;
     isSelecting = false;
 
+    const currentData = chartData;
+    const times = currentData?.times || [];
+    if (!times.length) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const canvasWidth = canvas.offsetWidth;
     const selectionEnd = x / canvasWidth;
+
+    selectionBox.style.display = 'none';
+    selectionLabel.style.display = 'none';
 
     const start = Math.min(selectionStart, selectionEnd);
     const end = Math.max(selectionStart, selectionEnd);
@@ -278,19 +434,31 @@ function addChartSelectionListener(canvas, chart, times, data) {
     }
 
     // Zoom sull'intervallo selezionato
-    const xScale = chart.scales.x;
-    xScale.min = startIndex;
-    xScale.max = endIndex - 1;
-    chart.update();
+    const minIndex = Math.max(0, startIndex);
+    const maxIndex = Math.min(times.length - 1, endIndex - 1);
+
+    chart.options.scales.x.min = minIndex;
+    chart.options.scales.x.max = maxIndex;
+    if (typeof chart.zoomScale === 'function') {
+      chart.zoomScale('x', { min: minIndex, max: maxIndex });
+    } else {
+      chart.update();
+    }
+    zoomState = { min: minIndex, max: maxIndex };
+    if (DEBUG_ZOOM) {
+      console.log('[zoom] selection', zoomState);
+    }
 
     // Aggiorna statistiche per la finestra selezionata
-    updateStatistics(data, startIndex, endIndex - 1);
+    updateStatistics(currentData, startIndex, endIndex - 1);
 
     canvas.style.cursor = 'default';
   });
 
   canvas.addEventListener('mouseleave', () => {
     isSelecting = false;
+    selectionBox.style.display = 'none';
+    selectionLabel.style.display = 'none';
     canvas.style.cursor = 'default';
   });
 }
@@ -320,7 +488,7 @@ function updateStatistics(data, startIndex, endIndex) {
     ? formatNumber(visibleEnergy[visibleEnergy.length - 1] - visibleEnergy[0], 4)
     : visibleEnergy.length === 1
     ? formatNumber(visibleEnergy[0], 4)
-    : '0.0000';
+    : formatNumber(0, 4);
 
   // Mostra intervallo temporale
   const timeRange = visibleTimes.length > 0
@@ -338,6 +506,8 @@ function updateStatistics(data, startIndex, endIndex) {
 function clearCharts() {
   if (instantPowerChart) instantPowerChart.destroy();
   if (cumulativePowerChart) cumulativePowerChart.destroy();
+  instantPowerChart = null;
+  cumulativePowerChart = null;
 
   document.getElementById('avgPower').textContent = '-';
   document.getElementById('maxPower').textContent = '-';
@@ -347,8 +517,23 @@ function clearCharts() {
 }
 
 function resetZoom() {
-  if (instantPowerChart) instantPowerChart.resetZoom();
-  if (cumulativePowerChart) cumulativePowerChart.resetZoom();
+  zoomState = null;
+  if (instantPowerChart) {
+    instantPowerChart.options.scales.x.min = undefined;
+    instantPowerChart.options.scales.x.max = undefined;
+    if (typeof instantPowerChart.resetZoom === 'function') {
+      instantPowerChart.resetZoom();
+    }
+    instantPowerChart.update();
+  }
+  if (cumulativePowerChart) {
+    cumulativePowerChart.options.scales.x.min = undefined;
+    cumulativePowerChart.options.scales.x.max = undefined;
+    if (typeof cumulativePowerChart.resetZoom === 'function') {
+      cumulativePowerChart.resetZoom();
+    }
+    cumulativePowerChart.update();
+  }
 }
 
 function updateStatus(message) {
