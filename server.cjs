@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const express = require("express");
 const path = require("path");
 const fs = require('fs').promises;
@@ -388,13 +388,15 @@ app.post("/api/energy", async (req, res) => {
   }
 });
 
-// Start Express server
-app.listen(PORT, () => {
-  console.log(`🌐 Dashboard disponibile su http://localhost:${PORT}/dashboard.html`);
-  console.log(`📊 API endpoint: http://localhost:${PORT}/api/logs/:date`);
-});
-
 ensureLogsDir();
+
+// Start Express server only when run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`ĐYO? Dashboard disponibile su http://localhost:${PORT}/dashboard.html`);
+    console.log(`ĐY"S API endpoint: http://localhost:${PORT}/api/logs/:date`);
+  });
+}
 module.exports = {
   getAccessToken,
   fetchDeviceReportLogs,
@@ -404,3 +406,4 @@ module.exports = {
   loadDeviceLogs,
   getLogsFilePath
 };
+
