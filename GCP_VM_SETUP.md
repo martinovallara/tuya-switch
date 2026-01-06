@@ -92,7 +92,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/home/<user>/tuya-switch
-ExecStart=/usr/bin/node public/tuya-logs.js
+ExecStart=/usr/bin/node public/tuya-logs.cjs
 Restart=always
 RestartSec=5
 EnvironmentFile=/home/<user>/tuya-switch/.env
